@@ -134,7 +134,7 @@ function register_sib_settings() {
  * @since 1.0.0
  * 
  * @param strig $ip_list
- * @return string
+ * @return array
  */
 function sanitize_ip_list( $ip_list ) {
 
