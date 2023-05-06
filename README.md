@@ -1,4 +1,4 @@
-#Simple IP Blocker
+=== Simple IP Blocker ===
 Contributors:  ITSDC
 Tags: ip-blocking, ip-blocklists
 Requires at least: 6.1
