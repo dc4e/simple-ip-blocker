@@ -30,10 +30,7 @@ function check_for_blocked_ips() {
     if (
         isset( $_SERVER["HTTP_X_FORWARDED_FOR"] ) &&
         false !== filter_var( $_SERVER["HTTP_X_FORWARDED_FOR"] , FILTER_VALIDATE_IP ) &&
-        (
-            false !== in_array( $_SERVER["HTTP_X_FORWARDED_FOR"], $blocked_xff_ips, true ) ||
-            false !== in_array( $_SERVER["HTTP_X_FORWARDED_FOR"], $blocked_ra_ips, true )
-        )
+        false !== in_array( $_SERVER["HTTP_X_FORWARDED_FOR"], $blocked_xff_ips, true )      
     ) {
         wp_die(
             'Forbidden',
