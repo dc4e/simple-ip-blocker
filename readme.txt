@@ -1,5 +1,5 @@
 === Simple IP Blocker ===
-Contributors:  ITSDC
+Contributors:  maybebernd
 Tags: ip-blocking, ip-blocklists
 Requires at least: 6.1
 Tested up to: 6.2
