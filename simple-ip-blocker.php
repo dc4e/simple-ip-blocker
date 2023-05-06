@@ -1,8 +1,9 @@
 <?php
 /**
  * Plugin Name: Simple IP Blocker
+ * Plugin URI: https://github.com/dc4e/simple-ip-blocker
  * Description: A small plugin for creating IP blocklists. IPs can be blocked via REMOTE_ADDR or if the application runs behind a proxy via X-Forwarded-For. The plugin adds a subpage to the main menu of the settings page.
- * Author: ITSDC
+ * Author: maybebernd
  * Version: 1.0.0
  * 
  */
@@ -11,7 +12,7 @@ namespace SimpleIpBlocker;
 defined( 'ABSPATH' ) || die();
 
 \add_action(
-    'init',
+    'plugin_loaded',
     __NAMESPACE__ . '\check_for_blocked_ips'
 );
 
@@ -22,13 +23,17 @@ defined( 'ABSPATH' ) || die();
  */
 function check_for_blocked_ips() {
 
-    $blocked_xff_ips = \get_option( 'sib_blocked_xff_ips', '' );
-    $blocked_ra_ips = \get_option( 'sib_blocked_ra_ips', '' );
+    $blocked_xff_ips = \get_option( 'sib_blocked_xff_ips', [] );
+    $blocked_ra_ips = \get_option( 'sib_blocked_ra_ips', [] );
 
+    
     if (
         isset( $_SERVER["HTTP_X_FORWARDED_FOR"] ) &&
         false !== filter_var( $_SERVER["HTTP_X_FORWARDED_FOR"] , FILTER_VALIDATE_IP ) &&
-        false !== strpos( $blocked_xff_ips, $_SERVER["HTTP_X_FORWARDED_FOR"] )
+        (
+            false !== in_array( $_SERVER["HTTP_X_FORWARDED_FOR"], $blocked_xff_ips, true ) ||
+            false !== in_array( $_SERVER["HTTP_X_FORWARDED_FOR"], $blocked_ra_ips, true )
+        )
     ) {
         wp_die(
             'Forbidden',
@@ -40,7 +45,7 @@ function check_for_blocked_ips() {
     } elseif (
         isset( $_SERVER["REMOTE_ADDR"] ) &&
         false !== filter_var( $_SERVER["REMOTE_ADDR"] , FILTER_VALIDATE_IP ) &&
-        false !== strpos( $blocked_ra_ips, $_SERVER["REMOTE_ADDR"] )
+        false !== in_array( $_SERVER["REMOTE_ADDR"], $blocked_ra_ips, true )
     ) {
          wp_die(
             'Forbidden',
@@ -50,6 +55,7 @@ function check_for_blocked_ips() {
             ]
         );
     }
+    
 
 }
 
@@ -100,7 +106,7 @@ function register_sib_settings() {
         'sib-options',
         'sib_blocked_xff_ips',
         [
-            'type' => 'string',
+            'type' => 'array',
             'description' => __( 'comma-separated list of blocked X-Forwarded-For IPs', 'simple-ip-blocker' ),
             'sanitize_callback' => __NAMESPACE__ . '\sanitize_ip_list',
             'show_in_rest' => false,
@@ -112,7 +118,7 @@ function register_sib_settings() {
         'sib-options',
         'sib_blocked_ra_ips',
         [
-            'type' => 'string',
+            'type' => 'array',
             'description' => __( 'comma-separated list of blocked Remote-Address IPs', 'simple-ip-blocker' ),
             'sanitize_callback' => __NAMESPACE__ . '\sanitize_ip_list',
             'show_in_rest' => false,
@@ -133,7 +139,7 @@ function register_sib_settings() {
 function sanitize_ip_list( $ip_list ) {
 
     if ( empty( $ip_list ) ) {
-        return '';
+        return [];
     }
 
     $ips = explode( ',', $ip_list );
@@ -154,8 +160,6 @@ function sanitize_ip_list( $ip_list ) {
 
     $sanitized_ips = array_unique( $sanitized_ips );
 
-    $sanitized_ips = implode( ', ', $sanitized_ips );
-
     return $sanitized_ips;
 
 }
@@ -167,8 +171,11 @@ function sanitize_ip_list( $ip_list ) {
  */
 function display_options_page() {
     
-    $blocked_xff_ips = \get_option( 'sib_blocked_xff_ips', '' );
-    $blocked_ra_ips = \get_option( 'sib_blocked_ra_ips', '' );
+    $blocked_xff_ips = \get_option( 'sib_blocked_xff_ips', [] );
+    $blocked_ra_ips = \get_option( 'sib_blocked_ra_ips', [] );
+
+    $blocked_xff_ips = implode( ', ', $blocked_xff_ips );
+    $blocked_ra_ips = implode( ', ', $blocked_ra_ips );
 
     ?>
     <div id="sib-options-page-container">
