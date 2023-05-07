@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/dc4e/simple-ip-blocker
  * Description: A small plugin for creating IP blocklists. IPs can be blocked via REMOTE_ADDR or if the application runs behind a proxy via X-Forwarded-For. The plugin adds a subpage to the main menu of the settings page.
  * Author: maybebernd
- * Version: 1.0.0
+ * Version: 1.0.1
  * 
  */
 namespace SimpleIpBlocker;
@@ -123,6 +123,18 @@ function register_sib_settings() {
         ]
     );
 
+    \register_setting(
+        'sib-options',
+        'sib_blocked_htaccess_xff_ips',
+        [
+            'type' => 'array',
+            'description' => __( 'comma-separated list of blocked htaccess X-Forwarded-For IPs', 'simple-ip-blocker' ),
+            'sanitize_callback' => __NAMESPACE__ . '\sanitize_xff_for_htaccess_ip_list',
+            'show_in_rest' => false,
+            'default' => ''
+        ]
+    );
+
 }
 
 /**
@@ -139,7 +151,11 @@ function sanitize_ip_list( $ip_list ) {
         return [];
     }
 
-    $ips = explode( ',', $ip_list );
+    if ( is_string( $ip_list ) ) {
+        $ips = explode( ',', $ip_list );
+    } else {
+        $ips = $ip_list;
+    }
 
     $sanitized_ips = [];
 
@@ -161,6 +177,73 @@ function sanitize_ip_list( $ip_list ) {
 
 }
 
+function sanitize_xff_for_htaccess_ip_list( $ip_list ) {
+
+    $sanitized_ips = sanitize_ip_list( $ip_list );
+
+    if ( empty( $sanitized_ips ) ) {
+        return [];
+    }
+
+    update_htaccess_file( $sanitized_ips );
+
+    return $sanitized_ips;
+
+}
+
+function update_htaccess_file( $ip_list ) {
+
+    if ( empty( $ip_list ) ) {
+        return;
+    }
+
+    $htaccess_file = ABSPATH . '/.htaccess';
+
+    if ( ! file_exists( $htaccess_file ) ) {
+        touch( $htaccess_file );
+    }
+
+    $htaccess_content = file_get_contents( $htaccess_file );
+
+    $start_string = "\n\n# BEGIN Simple-IP-Blocker Rules\n";
+    $end_string = "# END Simple-IP-Blocker Rules\n";
+
+    $rule_template = get_htaccess_content_template();
+
+    $current_rule_start_index = strpos( $htaccess_content, $start_string );
+
+    if ( false === $current_rule_start_index ) {
+        // Adds the rule
+        $htaccess_content .= sprintf(
+            $rule_template, implode( '","', $ip_list )
+        );
+    } else {
+
+        $current_rule_length = strpos( $htaccess_content, $end_string, $current_rule_start_index ) + strlen( $end_string ) - $current_rule_start_index;
+
+        $current_rule = substr( $htaccess_content, $current_rule_start_index, $current_rule_length );
+
+        $htaccess_content = str_replace( 
+            $current_rule,
+            sprintf(
+                $rule_template, implode( '","', $ip_list )
+            ),
+            $htaccess_content 
+        );
+
+    }
+
+    file_put_contents( $htaccess_file, $htaccess_content );
+
+}
+
+function get_htaccess_content_template() {
+
+    return "\n\n# BEGIN Simple-IP-Blocker Rules\n\n<Files *>\n\tSetEnvIF X-FORWARDED-FOR \"%s\" DenyIP\n\tOrder allow,deny\n\tAllow from all\n\tDeny from env=DenyIP\n</Files>\n\n# END Simple-IP-Blocker Rules\n";
+
+}
+
+
 /**
  * Displays the settings page html
  * 
@@ -170,9 +253,11 @@ function display_options_page() {
     
     $blocked_xff_ips = \get_option( 'sib_blocked_xff_ips', [] );
     $blocked_ra_ips = \get_option( 'sib_blocked_ra_ips', [] );
+    $blocked_htaccess_xff_ips = \get_option( 'sib_blocked_htaccess_xff_ips', [] );
 
     $blocked_xff_ips = implode( ', ', $blocked_xff_ips );
     $blocked_ra_ips = implode( ', ', $blocked_ra_ips );
+    $blocked_htaccess_xff_ips = implode( ', ', $blocked_htaccess_xff_ips );
 
     ?>
     <div id="sib-options-page-container">
@@ -187,6 +272,9 @@ function display_options_page() {
             \do_settings_sections( 'sib-options' );
             ?>
 
+            <h5>
+                <?php esc_html_e( 'Blocking over \'plugin_loaded\' hook' );?>
+            </h5>
             <div style="display: flex; flex-direction: column; margin-right: 20px;">
                 <label for="sib_blocked_ra_ips">
                     <?php \esc_html_e( 'Enter a comma-separated list of Remote-Address IPs to block.', 'simple-ip-blocker' );?>
@@ -199,6 +287,17 @@ function display_options_page() {
                     <?php \esc_html_e( 'Enter a comma-separated list of X-Forwarded-For IPs to block.', 'simple-ip-blocker' );?>
                 </label>
                 <textarea id="sib_blocked_xff_ips" name="sib_blocked_xff_ips"><?php echo \esc_html( $blocked_xff_ips );?></textarea>
+            </div>
+
+            <h5>
+                <?php esc_html_e( 'Blocking XFF via the .htaccess file (experimental)' );?>
+            </h5>
+           
+            <div style="display: flex; flex-direction: column; margin-right: 20px;">
+                <label for="sib_blocked_htaccess_xff_ips">
+                    <?php \esc_html_e( 'Enter a comma-separated list of X-Forwarded-For IPs to block.', 'simple-ip-blocker' );?>
+                </label>
+                <textarea id="sib_blocked_htaccess_xff_ips" name="sib_blocked_htaccess_xff_ips"><?php echo \esc_html( $blocked_htaccess_xff_ips );?></textarea>
             </div>
         
             <?php \submit_button(); ?>
