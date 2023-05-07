@@ -14,3 +14,16 @@ The plugin stores all blocked ips inside two differend WordPress options. Those 
 The first list ist used to block the REMOTE_ADDR IPs the second one is used to block X-Forwarded-For IPs.
 The plugin adds a subpage to the main menu of the settings page.
 The client IP check is done over the 'plugin_loaded' hook.
+
+
+== Changelog ===
+
+= 1.0.1 =
+* Minor bug fixes
+* XFF IP blocking over .htaccess
+
+== Upgrade Notice ==
+
+= 1.0.1 =
+
+More testing and support for XFF IP blockering over .htaccess
