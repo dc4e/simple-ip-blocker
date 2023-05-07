@@ -223,10 +223,16 @@ function update_htaccess_file( $ip_list ) {
 
         $current_rule = substr( $htaccess_content, $current_rule_start_index, $current_rule_length );
 
+        $blocked_ips = '';
+
+        foreach( $ip_list as $ip ) {
+            $blocked_ips .=  "\tSetEnvIF X-FORWARDED-FOR \"{$ip}\" DenyIP\n";
+        }
+
         $htaccess_content = str_replace( 
             $current_rule,
             sprintf(
-                $rule_template, implode( '","', $ip_list )
+                $rule_template, $blocked_ips
             ),
             $htaccess_content 
         );
@@ -239,7 +245,7 @@ function update_htaccess_file( $ip_list ) {
 
 function get_htaccess_content_template() {
 
-    return "\n\n# BEGIN Simple-IP-Blocker Rules\n\n<Files *>\n\tSetEnvIF X-FORWARDED-FOR \"%s\" DenyIP\n\tOrder allow,deny\n\tAllow from all\n\tDeny from env=DenyIP\n</Files>\n\n# END Simple-IP-Blocker Rules\n";
+    return "\n\n# BEGIN Simple-IP-Blocker Rules\n\n<Files *>\n%s\tOrder allow,deny\n\tAllow from all\n\tDeny from env=DenyIP\n</Files>\n\n# END Simple-IP-Blocker Rules\n";
 
 }
 
@@ -290,7 +296,7 @@ function display_options_page() {
             </div>
 
             <h5>
-                <?php esc_html_e( 'Blocking XFF via the .htaccess file (experimental)' );?>
+                <?php esc_html_e( 'Blocking XFF via the .htaccess file, (experimental)' );?>
             </h5>
            
             <div style="display: flex; flex-direction: column; margin-right: 20px;">
