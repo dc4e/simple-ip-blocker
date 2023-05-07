@@ -226,7 +226,10 @@ function update_htaccess_file( $ip_list ) {
         $blocked_ips = '';
 
         foreach( $ip_list as $ip ) {
-            $blocked_ips .=  "\tSetEnvIF X-FORWARDED-FOR \"{$ip}\" DenyIP\n";
+
+            $ip = str_replace( '.', '\.', $ip );
+
+            $blocked_ips .=  "\tSetEnvIF X-FORWARDED-FOR \"^{$ip}\" DenyIP\n";
         }
 
         $htaccess_content = str_replace( 
@@ -296,7 +299,7 @@ function display_options_page() {
             </div>
 
             <h5>
-                <?php esc_html_e( 'Blocking XFF via the .htaccess file, (experimental)' );?>
+                <?php esc_html_e( 'Blocking XFF via the .htaccess file. (experimental)' );?>
             </h5>
            
             <div style="display: flex; flex-direction: column; margin-right: 20px;">
