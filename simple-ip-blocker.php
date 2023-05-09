@@ -302,6 +302,11 @@ function update_htaccess_file( $ip_list ) {
 
         foreach( $ip_list as $ip ) {
 
+            if ( false !== strpos( $ip, '/' ) ) {
+                $ip_parts = explode( '.', $ip );
+                $ip = "{$ip_parts[0]}.{$ip_parts[1]}.{$ip_parts[2]}.";
+            }
+
             $ip = str_replace( '.', '\.', $ip );
 
             $blocked_ips .=  "\tSetEnvIF X-FORWARDED-FOR \"^{$ip}\" DenyIP\n";
