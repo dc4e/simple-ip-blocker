@@ -23,14 +23,10 @@ defined( 'ABSPATH' ) || die();
  */
 function check_for_blocked_ips() {
 
-    $blocked_xff_ips = \get_option( 'sib_blocked_xff_ips', [] );
-    $blocked_ra_ips = \get_option( 'sib_blocked_ra_ips', [] );
-
-    
     if (
         isset( $_SERVER["HTTP_X_FORWARDED_FOR"] ) &&
         false !== filter_var( $_SERVER["HTTP_X_FORWARDED_FOR"] , FILTER_VALIDATE_IP ) &&
-        false !== in_array( $_SERVER["HTTP_X_FORWARDED_FOR"], $blocked_xff_ips, true )      
+        ip_check( $_SERVER["HTTP_X_FORWARDED_FOR"], 'sib_blocked_xff_ips' )      
     ) {
         wp_die(
             'Forbidden',
@@ -42,7 +38,7 @@ function check_for_blocked_ips() {
     } elseif (
         isset( $_SERVER["REMOTE_ADDR"] ) &&
         false !== filter_var( $_SERVER["REMOTE_ADDR"] , FILTER_VALIDATE_IP ) &&
-        false !== in_array( $_SERVER["REMOTE_ADDR"], $blocked_ra_ips, true )
+        ip_check( $_SERVER["REMOTE_ADDR"], 'sib_blocked_ra_ips' )
     ) {
          wp_die(
             'Forbidden',
@@ -52,7 +48,69 @@ function check_for_blocked_ips() {
             ]
         );
     }
+   
+}
+
+/**
+ * Checks if the client ip is inside the blocklist or part of a block list CIDR
+ * 
+ * @since 1.0.0
+ * 
+ * @param string $client_ip
+ * @param string $block_list
+ * @return bool
+ */
+function ip_check( string $client_ip, string $block_list_name ) {
     
+    if ( empty( $block_list_name ) ) {
+        return false;
+    }
+    
+    $block_list = \get_option( $block_list_name, [] );
+
+    $in_block_list = false;
+    foreach( $block_list as $entry ) {
+
+        if ( 
+            false !== strpos( $entry, '/' ) &&
+            ip_cidr_check( $client_ip, $entry )
+        ) {
+            $in_block_list = true;
+            break;
+        } elseif ( $client_ip === $entry ) {
+            $in_block_list = true;
+            break;
+        }
+
+    }
+
+    return $in_block_list;
+
+}
+
+/**
+ * Checks if the client ip is part of a blocked cidr
+ * 
+ * @since 1.0.0
+ * 
+ * @see https://www.php.net/manual/en/ref.network.php#74656
+ * 
+ * @param string $client_ip
+ * @param string $cidr
+ * @return true
+ */
+function ip_cidr_check( $client_ip, $cidr ) {
+    
+    list ($net, $mask) = explode("/", $cidr);
+
+    $ip_net = ip2long($net);
+    $ip_mask = ~((1 << (32 - $mask)) - 1);
+    
+    $ip_ip = ip2long ($client_ip);
+
+    $ip_ip_net = $ip_ip & $ip_mask;
+
+    return ($ip_ip_net == $ip_net);
 
 }
 
@@ -163,7 +221,24 @@ function sanitize_ip_list( $ip_list ) {
 
         $ip = trim( $ip );
 
-        if ( false === filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+        if ( false !== strpos( $ip, '/' ) ) {
+            $range_parts = explode( '/', $ip );
+
+            $ip = $range_parts[0];
+            $cidr = (int) $range_parts[1];
+
+            if (
+                false === filter_var( $ip, FILTER_VALIDATE_IP ) ||
+                0 > $cidr ||
+                32 < $cidr
+            ) {
+                continue;
+            }
+
+            $ip = "{$ip}/{$cidr}";
+
+
+        } elseif ( false === filter_var( $ip, FILTER_VALIDATE_IP ) ) {
             continue;
         }
 
